@@ -1,89 +1,69 @@
-# Analyzing Minecraft Player Engagement: Predicting High Data Contributors with KNN
+# Predicting High Data Contributors in Minecraft
 
-As part of a research project led by a UBC Computer Science group, data is being collected from a Minecraft server to understand player behavior. The research team faces an important question: *Which types of players are most likely to contribute substantial amounts of gameplay data?* This is crucial for resource planning and recruitment, as understanding which players generate the most data allows for better targeting of efforts and more effective management of server resources. In this post, we describe how we used machine learning, specifically K-Nearest Neighbors (KNN), to predict which players would contribute the most data, based on their demographics and in-game behaviors.
+A team of researchers are trying to understand how players behave on a [Minecraft server](https://plaicraft.ai/). They want to know: *Who are the players most likely to contribute a lot of data?* This is an important question for managing server resources and planning player recruitment efforts, as knowing which players are most active, i.e., contributed more total played hours, helps the team prepare for the right level of engagement. 
 
-## Problem Overview: Targeting High Data Contributors
+## Our Data: Who Are These Players?
 
-The problem we set out to solve was to identify characteristics of players most likely to contribute large amounts of gameplay data. With this knowledge, the research group can better plan for future recruitment campaigns, target resources more effectively, and ensure the server can handle a growing number of active users. We hypothesized that certain demographics, like age, experience level, and subscription status, might correlate with higher playtime and therefore greater data contributions.
+To do this, I used two main datasets:
 
-## Dataset Overview: Players and Sessions
+- **Players Data**: This dataset contains information about each player. Some of the key details include:
+  - `experience`: How experienced the player is (e.g., "Amateur," "Regular").
+  - `subscribe`: Whether or not the player signed up for email updates from the server.
+  - `gender`: The player’s gender.
+  - `played_hours`: Total hours the player has spent playing the game.
+  - `age`: How old the player is.
 
-We worked with two main datasets, `players.csv` and `sessions.csv`, each capturing different aspects of player activity.
+- **Sessions Data**: This dataset records the details of every session a player has. For example:
+  - `start_time` and `end_time`: When the player started and finished their session.
+  - `original_start_time` and `original_end_time`: Numeric timestamps used to calculate the session’s duration.
 
-- **Players Data (196 rows, 9 variables)**: This dataset contained player-level information, including:
-  - `experience`: the player's experience level (e.g., "Amateur", "Regular").
-  - `subscribe`: whether the player subscribed to email updates.
-  - `gender`: the player's gender.
-  - `played_hours`: total playtime of the player.
-  - `age`: the player's age.
-  
-  Key data points like `hashedEmail` helped link player actions across datasets.
+### Data Cleaning and Wrangling
 
-- **Sessions Data (1535 rows, 5 variables)**: This dataset recorded detailed session-level information, such as:
-  - `start_time` and `end_time`: timestamps of when a session started and ended.
-  - `original_start_time` and `original_end_time`: numeric timestamps to calculate session durations.
+Before jumping into the analysis, I wrangled and combined two datasets to create a condensed and useful dataset, including dropping irrelevant Data like `individualId` and `organizationName` columns as all of them are `NA`, summing up total playtime from the `Sessions` dataset and compared to the `played_hours` in the `Players` dataset, etc.
 
-Upon cleaning the data, we focused on aggregating session data to compute each player's total playtime. We identified discrepancies between total hours played in the `players.csv` and `sessions.csv` datasets, and opted to use the `played_hours` from `players.csv` as it was more reliable. We also noticed issues with missing values in columns like `individualId` and `organizationName`, and handled this by removing those variables from our analysis.
+## Exploratory Data Analysis(EDA)
 
-## Data Wrangling and Exploration
+EDA revealed some interesting insights, including the distribution of playtime and key demographic patterns among the players.
 
-Data wrangling is crucial in transforming raw data into a useful format. To prepare for the KNN model, we performed several steps:
+1. **Playtime Distribution**: The histogram below (Figure 1) shows how the playtime is spread out across all players. Most players didn’t play/contribute much, but a small group of players played for lots of hours. It was a pretty classic "long-tail" distribution—few players contribute a lot, while most contribute just a little.<br>
+   ![Total Played Hours Distribution](./img/figure_4_1.png)<br>
+   *Figure 1: Distribution of Total Playtime*  
 
-1. **Handling Missing Data**: We removed irrelevant variables (`individualId`, `organizationName`) with excessive missing data.
-2. **Summarizing Player Behavior**: We aggregated total playtime (`played_hours_sum`) and session counts (`sessions_played`) by player (`hashedEmail`).
-3. **Transforming Variables**: We converted categorical variables like `experience`, `gender`, and `subscribe` into factors suitable for KNN classification.
-4. **Creating a Binary Target**: To classify players into high or low contributors, we created a binary column `high_contribution`, setting a threshold at the mean of `played_hours` (players with hours above the mean were labeled as "high contributors").
+2. **Demographics Matter**: I also explored how different player demographics (like age, gender, and experience) affected their playtime:
+   - **Experience**: Players who called themselves "Amateurs" or "Regulars" tended to log more hours. This was a bit of a surprise, as I might expect the more experienced "Veterans" or "Pros" to play more. But it turns out that experience isn’t always the biggest factor.
+   - **Subscription**: As the bar chart for distribution of total played hours among subscription (Figure 2) shown below: players who signed up for email updates played significantly more than those who didn’t. This suggests that email engagement might lead to higher playtime.<br>
+   ![Subs Distribution](./img/figure_4_2.png)<br>
+   *Figure 2: Total Playtime by subscription*
+   - **Age**: Younger players (under 30) appears to contribute more data, as the scatter plot (Figure 3) shown below.<br>
+   ![Subs Distribution](./img/figure_4_3.png)<br>
+   *Figure 3: Total Playtime by Age*
+   - **Gender**: Also, male players contributed more data/played more hours according to the distribution plot below, however, I wonder it could be due to the dataset has more data records associated with male player, that is, there could be imbalance in the original dataset<br>
+   ![Subs Distribution](./img/figure_4_4.png)<br>
+   *Figure 4: Total Playtime by Gender*  
 
-Once the data was cleaned and transformed, we performed some exploratory data analysis (EDA) to visualize the key relationships.
+## The Model: Predicting High Contributors with KNN
 
-## Exploratory Data Analysis
+Now, the fun part: using a machine learning model to predict which players will be the biggest contributors. I used **K-Nearest Neighbors (KNN)** classification model, which is like saying, "If a player is similar to other players in terms of age, experience, gender, and sessions played, they will probably contribute a similar amount of playtime."
 
-Exploratory analysis allowed us to uncover patterns and better understand the data before applying machine learning models.
+1. **Data Preprocessing and feature engineering**: I created a binary target column `high_contribution` for KNN classification, based on the threshold (the mean of `played_hours`). Meanwhile, I found out the original dataset are quite imbalanced, so I [upsampled](https://search.r-project.org/CRAN/refmans/groupdata2/html/upsample.html), the dataset based on gender and target, i.e., balanced the dataset so that each gender has almost equal number of data rows, and same for the target feature that we want to predict on.
+2. **Choosing "K"**: The KNN classification model requires choosing the number of neighbors (`K`) to compare each player to, so I tuned and trained the model using a range of Ks. And as the line graph shows below, it appeared that `k = 6` worked best as it gave the best accuracy for a trained KNN model.<br>
+   ![Accuracies_vs_K](./img/figure_6_1.png)<br>
+   *Figure 5: Accuracies vs. Number of neighbors (K)*
+3. **Prediction**: After training the model, I checked its performance with a test dataset that was split and put aside for evaluation, and the KNN model was able to predict high contributors with 97% recall accuracy, meaning 97 out of 100 the true highly contributive players are predicted correctly.
 
-1. **Playtime Distribution**: A histogram of total playtime (`played_hours`) showed that most players contributed very little playtime, with a small group contributing significantly more hours. This confirmed that there was a long-tail distribution, with a few high contributors and many low ones.
+## Results
+The model pretty much confirmed what I expected: "Amateur" and "Regular" players were the biggest contributors, while "Veterans" and "Pros" didn’t play as much as I thought they would. I also found that players who signed up for email updates played more, so those little nudges really seem to do the trick! It turns out younger players, especially in their teens and early twenties, were the most active, with young males leading the way, as you can see in the box plot below.
+   ![Gender_and_age](./img/figure_6_2.png) <br>
+   *Figure 6: Accuracies vs. Number of neighbors (K)*
 
-   *Figure 1: Distribution of Total Playtime*
+## Caveats: Things to Keep in Mind
 
-2. **Sessions vs. Playtime**: A scatterplot of `sessions_played` vs. `played_hours` (log-transformed for clarity) revealed a strong positive relationship: more sessions generally led to more total playtime. This indicated that players with higher engagement (more sessions) were more likely to contribute large amounts of data.
+While the results are interesting, there are a few things we need to be cautious about:
 
-   *Figure 2: Sessions Played vs. Total Playtime*
+1. *Class Imbalance*: Most players contribute very little data, and there is also imbalance among gender and ages, so the model might be biased. I tried to balance this, but it’s still something to watch out for.
+2. *Missing Data*: Some players' information was incomplete. I removed those rows, but I might have lost useful insights about why they contribute less.
+3. *Arbitrary Threshold*: I defined "high contributors" based on the average total playtime, but this is somewhat arbitrary, there could be other approaches, like the played hours in one single session.
 
-3. **Demographics vs. Playtime**: We also examined how different demographic factors influenced playtime. Key findings include:
-   - **Experience Level**: Players who identified as "Amateur" or "Regular" tended to log more hours, suggesting a correlation between experience and playtime.
-   - **Subscription Status**: Players who subscribed to the server's email updates contributed significantly more playtime compared to non-subscribed players.
-   - **Age and Gender**: Younger players (under 30) were more likely to contribute more data. Males generally had higher playtime, though females were also well represented among the higher playtime contributors.
+## To conclude
 
-   *Figure 3: Playtime by Age and Gender*
-
-## KNN Classification: Predicting High Contributors
-
-To address the core question—*which players are likely to contribute the most data?*—we applied K-Nearest Neighbors (KNN) classification. KNN is a non-parametric algorithm that classifies players into "high" or "low" contributors based on their similarity to others in the dataset.
-
-### Steps in our KNN Analysis:
-
-1. **Feature Scaling**: Since KNN relies on distance metrics, we standardized numerical features like `age` and `played_hours` to ensure they were on the same scale.
-2. **Model Tuning**: We performed cross-validation to select the optimal number of neighbors (`k`) for our model. After experimenting with several values of `k`, we found that `k = 5` provided the best balance between model complexity and accuracy.
-3. **Model Evaluation**: The model's performance was evaluated using accuracy, precision, and recall. The best model achieved an accuracy of **78%** in predicting high data contributors.
-
-## Results: Insights from the Model
-
-The KNN model provided useful insights into the factors that predict high data contributors:
-
-1. **Experience**: Players categorized as "Amateur" or "Regular" contributed the most hours, while "Veterans" and "Pros" contributed less than expected. This was a surprising finding, as we expected more experienced players to be more engaged.
-2. **Subscription**: Subscribed players were more likely to be high contributors, suggesting that email engagement boosts player participation.
-3. **Age**: Players aged 14–25 were most likely to contribute significant data, confirming that younger players tend to spend more time on the server.
-4. **Gender**: Males generally contributed more data, though females were notably present among the highest contributors.
-
-## Caveats and Limitations
-
-While the results were insightful, several caveats should be considered:
-
-1. **Class Imbalance**: The dataset was highly imbalanced, with many players contributing zero or very few hours. This could have led to biased predictions, especially for the "high contributor" class. We addressed this by oversampling, but the model may still be biased toward predicting low contributors.
-2. **Missing Data**: Certain columns (e.g., `individualId`) were removed due to missing values. This could have excluded useful information that might have improved the model’s accuracy.
-3. **Arbitrary Threshold**: The binary classification of high vs. low contributors based on the mean of `played_hours` is somewhat arbitrary. A more nuanced approach, such as predicting continuous playtime, could offer a better understanding of player engagement.
-
-## Conclusion: Impact and Future Directions
-
-The analysis reveals that **younger players**, especially those with **amateur or regular experience levels** and those who are **subscribed to updates**, are more likely to contribute significant data. This insight can guide the research group’s recruitment efforts, helping them target the most engaged players for their study. However, the findings also raise some questions, particularly why more experienced players contributed less than expected and how the increasing proportion of female gamers might change engagement patterns in the future.
-
-As the research evolves, future analyses could explore why certain experience levels contribute less data, and how targeted interventions could further increase player engagement.
+From this analysis, I learned that **younger players** and those with **amateur or regular experience levels** are most likely to contribute significant data. This is useful information for the research team to help them target the right players for future studies. However, I were surprised by the low contribution from more experienced players, and I still have a lot of questions to explore—like how can we improve engagement with more experienced players, and how will engagement change as the proportion of female players increases?
